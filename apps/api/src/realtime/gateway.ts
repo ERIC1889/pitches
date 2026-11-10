@@ -64,25 +64,45 @@ export function registerRealtimeGateway(
     };
 
     socket.on("session:join", async (payload, ack) => {
+      // 소켓 하나는 세션 하나만. 다시 join 하면 녹음 스트림을 새로 열지 않는다
+      if (sessionId) {
+        ack?.({ ok: false, error: "ALREADY_JOINED" });
+        return;
+      }
+      let parsed: { sessionId: string; token: string };
+      let decoded: { sub: string; sid: string };
       try {
-        const parsed = SessionJoinSchema.parse(payload);
-        const decoded = app.jwt.verify<{ sub: string; sid: string }>(
-          parsed.token
-        );
+        parsed = SessionJoinSchema.parse(payload);
+        decoded = app.jwt.verify<{ sub: string; sid: string }>(parsed.token);
         if (decoded.sid !== parsed.sessionId) {
           throw new Error("session mismatch");
         }
-        sessionId = parsed.sessionId;
-        userId = decoded.sub;
-        socket.join(`session:${sessionId}`);
-        startCapture(sessionId);
-        ack?.({ ok: true });
-        socket.emit("session:joined", { sessionId });
-        app.log.info({ sessionId, userId }, "socket joined, capture started");
       } catch (err) {
         ack?.({ ok: false, error: "INVALID_TOKEN" });
         socket.disconnect();
+        return;
       }
+
+      // 끝났거나 녹음이 이미 저장된 세션에 다시 붙으면 저장된 녹음을 덮어쓰게 된다
+      const session = await app.prisma.session.findFirst({
+        where: { id: parsed.sessionId, userId: decoded.sub },
+        select: { status: true, audioPath: true },
+      });
+      if (!session || session.status !== "IN_PROGRESS" || session.audioPath) {
+        ack?.({ ok: false, error: "SESSION_CLOSED" });
+        return;
+      }
+      // 다른 소켓이 같은 세션을 녹음 중 (await 이후 다시 확인해야 경쟁 상태가 없다)
+      if (sessionId || !startCapture(parsed.sessionId)) {
+        ack?.({ ok: false, error: sessionId ? "ALREADY_JOINED" : "ALREADY_ACTIVE" });
+        return;
+      }
+      sessionId = parsed.sessionId;
+      userId = decoded.sub;
+      socket.join(`session:${sessionId}`);
+      ack?.({ ok: true });
+      socket.emit("session:joined", { sessionId });
+      app.log.info({ sessionId, userId }, "socket joined, capture started");
     });
 
     socket.on("audio:chunk", async (payload) => {

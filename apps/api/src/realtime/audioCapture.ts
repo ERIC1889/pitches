@@ -21,12 +21,17 @@ export interface CaptureResult {
 
 const captures = new Map<string, CaptureHandle>();
 
-export function startCapture(sessionId: string): string {
+/**
+ * 세션 녹음 파일을 연다. 이미 녹음 중이면 false — 두 번째 스트림이 앞 녹음을 덮어쓰거나
+ * 닫히지 않은 파일 핸들이 쌓이지 않도록.
+ */
+export function startCapture(sessionId: string): boolean {
+  if (captures.has(sessionId)) return false;
   fs.mkdirSync(AUDIO_DIR, { recursive: true });
   const pcmPath = path.join(AUDIO_DIR, `${sessionId}.pcm`);
   const stream = fs.createWriteStream(pcmPath);
   captures.set(sessionId, { pcmPath, stream, bytes: 0 });
-  return pcmPath;
+  return true;
 }
 
 export function appendChunk(sessionId: string, pcm: Buffer): void {

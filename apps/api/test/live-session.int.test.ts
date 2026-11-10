@@ -35,7 +35,7 @@ async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   return (await res.json()) as T;
 }
 
-async function startLiveSession(): Promise<{ sessionId: string; sock: Socket }> {
+async function startLiveSession(): Promise<{ sessionId: string; wsToken: string; sock: Socket }> {
   const { sessionId, wsToken } = await api<{ sessionId: string; wsToken: string }>(
     "/sessions",
     { method: "POST", body: JSON.stringify({ title: "통합 테스트" }) }
@@ -43,7 +43,7 @@ async function startLiveSession(): Promise<{ sessionId: string; sock: Socket }> 
   const sock = connect(`${baseUrl}/live`, { transports: ["websocket"] });
   const joined = await sock.emitWithAck("session:join", { sessionId, token: wsToken });
   expect(joined).toEqual({ ok: true });
-  return { sessionId, sock };
+  return { sessionId, wsToken, sock };
 }
 
 function streamAudio(sock: Socket, pcm: Buffer) {
@@ -175,4 +175,30 @@ describe("live session", () => {
     });
     expect(res.status).toBe(409);
   });
+
+  it("중복 join · 다른 소켓의 동시 join · 끝난 세션 join 은 녹음을 새로 열지 않고 거절한다", async () => {
+    const { sessionId, wsToken, sock } = await startLiveSession();
+    streamAudio(sock, tone(2));
+
+    const again = await sock.emitWithAck("session:join", { sessionId, token: wsToken });
+    expect(again).toEqual({ ok: false, error: "ALREADY_JOINED" });
+
+    const other = connect(`${baseUrl}/live`, { transports: ["websocket"] });
+    const parallel = await other.emitWithAck("session:join", { sessionId, token: wsToken });
+    expect(parallel).toEqual({ ok: false, error: "ALREADY_ACTIVE" });
+
+    const ack = (await sock.emitWithAck("session:end")) as SessionEndAck;
+    expect(ack.ok).toBe(true);
+    sock.disconnect();
+    const session = await built.app.prisma.session.findUniqueOrThrow({ where: { id: sessionId } });
+    const sizeBefore = (await fs.stat(session.audioPath!)).size;
+
+    const late = await other.emitWithAck("session:join", { sessionId, token: wsToken });
+    expect(late).toEqual({ ok: false, error: "SESSION_CLOSED" });
+    other.disconnect();
+    await new Promise((r) => setTimeout(r, 300));
+    // 거절된 join 이 이미 저장된 녹음을 덮어쓰지 않아야 한다
+    expect((await fs.stat(session.audioPath!)).size).toBe(sizeBefore);
+  });
 });
+
