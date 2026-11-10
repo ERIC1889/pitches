@@ -1,0 +1,33 @@
+{
+  "name": "pitches",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "yarn@4.5.3",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "api:dev": "yarn workspace @pitches/api dev",
+    "api:build": "yarn workspace @pitches/api build",
+    "api:start": "yarn workspace @pitches/api start",
+    "api:worker": "yarn workspace @pitches/api worker:dev",
+    "mobile:start": "yarn workspace @pitches/mobile start",
+    "mobile:ios": "yarn workspace @pitches/mobile ios",
+    "mobile:android": "yarn workspace @pitches/mobile android",
+    "mobile:prebuild": "yarn workspace @pitches/mobile prebuild",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "db:logs": "docker compose logs -f",
+    "prisma:generate": "yarn workspace @pitches/api prisma:generate",
+    "prisma:migrate": "yarn workspace @pitches/api prisma:migrate",
+    "prisma:studio": "yarn workspace @pitches/api prisma:studio",
+    "typecheck": "yarn workspaces foreach -A -p run typecheck",
+    "emotion:dev": "yarn workspace @pitches/emotion dev",
+    "emotion:download": "yarn workspace @pitches/emotion download"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "typescript": "^5.6.3"
+  }
+}

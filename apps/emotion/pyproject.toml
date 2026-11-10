@@ -1,0 +1,24 @@
+[project]
+name = "pitches-emotion"
+version = "0.1.0"
+description = "Pitches.ai 음성 감정 분석 서비스 (SenseVoiceSmall + emotion2vec+, 로컬 CPU)"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "funasr>=1.2",
+  "torch>=2.4",
+  "torchaudio>=2.4",
+  "huggingface_hub",
+  "modelscope",
+  "numpy",
+  "fastapi>=0.115",
+  "uvicorn>=0.30",
+]
+
+[dependency-groups]
+dev = ["pytest>=8", "httpx"]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

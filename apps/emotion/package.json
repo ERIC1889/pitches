@@ -1,0 +1,10 @@
+{
+  "name": "@pitches/emotion",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "uv run uvicorn pitches_emotion.server:app --host 127.0.0.1 --port 8001",
+    "test": "uv run pytest -q",
+    "download": "uv run python -m pitches_emotion.models"
+  }
+}

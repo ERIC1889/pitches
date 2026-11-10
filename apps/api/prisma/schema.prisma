@@ -1,0 +1,77 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String?
+  appleSub     String?   @unique
+  name         String
+  locale       String    @default("ko")
+  sessions     Session[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model Session {
+  id          String         @id @default(cuid())
+  userId      String
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  startedAt   DateTime       @default(now())
+  endedAt     DateTime?
+  audioPath   String?
+  durationSec Int?
+  status      SessionStatus  @default(IN_PROGRESS)
+  ticks       FeedbackTick[]
+  report      Report?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([userId, createdAt])
+}
+
+model FeedbackTick {
+  id        String   @id @default(cuid())
+  sessionId String
+  session   Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  offsetMs  Int
+  color     String
+  speedWpm  Float
+  volumeDb  Float
+  fillerCnt Int
+  /// 감정 서비스 결과 (NEUTRAL, HAPPY ...). 서비스가 꺼져 있었거나 무음이면 null
+  emotion      String?
+  emotionScore Float?
+  /// SenseVoice 오디오 이벤트 (Speech, Laughter, Applause ...)
+  audioEvent   String?
+  tip       String?
+  createdAt DateTime @default(now())
+
+  @@index([sessionId, offsetMs])
+}
+
+model Report {
+  id            String   @id @default(cuid())
+  sessionId     String   @unique
+  session       Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  transcript    String   @db.Text
+  overallScore  Int
+  summary       Json
+  speechMetrics Json
+  pdfPath       String?
+  generatedAt   DateTime @default(now())
+}
+
+enum SessionStatus {
+  IN_PROGRESS
+  ANALYZING
+  COMPLETED
+  FAILED
+}
